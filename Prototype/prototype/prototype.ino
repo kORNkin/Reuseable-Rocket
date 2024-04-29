@@ -52,20 +52,21 @@ PID yPID(&yInput, &yOutput, &ySetpoint, consKp, consKi, consKd, DIRECT);
 
 Servo fin[5];
 
-
 bool DEBUG_YAW = 0;
 
 void setup() {
 
   Serial.begin(9600);
 
-  //FIN Pin Servo 
-  fin[1].attach(15);
+  /// FIN Pin Servo 
+  // pitch controling fin
+  fin[1].attach(15); 
   fin[2].attach(2);
-  fin[3].attach(4);
-  fin[4].attach(16);
+  // roll controling fin
+  fin[3].attach(4);  
+  fin[4].attach(16); 
 
-  //IMU Prt
+  //IMU Part
   if (!lsm6ds.begin_I2C()) {
     while (1) {
       delay(10);
