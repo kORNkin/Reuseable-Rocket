@@ -3,7 +3,6 @@
 #include <Adafruit_Sensor_Calibration.h>
 #include <Adafruit_LIS3MDL.h>
 #include <ESP32Servo.h>
-Servo fin1;
 
 Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
 
@@ -53,6 +52,9 @@ PID yPID(&yInput, &yOutput, &ySetpoint, consKp, consKi, consKd, DIRECT);
 
 Servo fin[5];
 
+
+bool DEBUG_YAW = 0;
+
 void setup() {
 
   Serial.begin(9600);
@@ -60,6 +62,8 @@ void setup() {
   //FIN Pin Servo 
   fin[1].attach(15);
   fin[2].attach(2);
+  fin[3].attach(4);
+  fin[4].attach(16);
 
   //IMU Prt
   if (!lsm6ds.begin_I2C()) {
@@ -84,22 +88,25 @@ void setup() {
 
   filter.begin(FILTER_UPDATE_RATE_HZ);
 
-  //PID Setpoints for Rocket's directions
+  //PID Setpoints for directions of Rocket
   pSetpoint = 0;
   rSetpoint = 0;
+  ySetpoint = 0;
 
-  //turn the PID on
+  //Turn the PID on and set range of output 
   pPID.SetMode(AUTOMATIC);
-  pPID.SetOutputLimits(-75, 75);
+  pPID.SetOutputLimits(-45, 45);
 
   rPID.SetMode(AUTOMATIC);
-  rPID.SetOutputLimits(-75, 75);
+  rPID.SetOutputLimits(-45, 45);
 
+  yPID.SetMode(AUTOMATIC);
+  yPID.SetOutputLimits(-45, 45);
 }
 
 void loop() {
 
-  float roll, pitch, heading;
+  float roll, pitch, yaw;
   float gx, gy, gz;
   static uint8_t counter = 0;
 
@@ -127,8 +134,11 @@ void loop() {
 
   roll = filter.getRoll();
   pitch = filter.getPitch();
-  heading = filter.getYaw();
-  Serial.print(heading);
+  yaw = filter.getYaw();
+  
+  yaw = UseableYaw(yaw);
+
+  Serial.print(yaw);
   Serial.print(", ");
   Serial.print(pitch);
   Serial.print(", ");
@@ -136,10 +146,58 @@ void loop() {
 
   pInput = pitch;
   rInput = roll;
+  yInput = yaw;
 
+  //------------ DEBUG YAW --------------
+  if(Serial.available()){
+    String in = Serial.readString();
+    if(in.toInt() == 1) Serial.println("--------- Yaw activate / ---------"), DEBUG_YAW = 0;
+    else Serial.println("--------- Yaw deactivate X ---------"),DEBUG_YAW = 1;
+  }
+  //-------------------------------------
+
+  //Check if heading is set then control only 2 axis (row, pitch)
+  //    , if not control heading first.
+  if(HeadIsOK(yaw) || DEBUG_YAW) 
+    RowPitchControl(); 
+  else  
+    YawControl();
+
+}
+
+bool HeadIsOK(double yaw){
+  int gapDeg = abs(yaw - ySetpoint);
+  if(gapDeg < 10){
+    return true;
+  }
+  return false;
+}
+
+// Compute yaw value for useable to pid's error parameter 
+double UseableYaw(double yaw){
+  if(yaw > 180) return yaw - 360;
+  return yaw; 
+}
+
+void YawControl(){
+  GapCheck(yPID, ySetpoint, yInput, 20);
+
+  yPID.Compute();
+  
+  Serial.print(", ");
+  Serial.println(yOutput);
+
+  //yaw controlling fin
+  fin[1].write( 90 + yOutput );
+  fin[2].write( 90 + yOutput );
+  fin[3].write( 90 + yOutput );
+  fin[4].write( 90 + yOutput );
+}
+
+void RowPitchControl(){
   //Gap check for using aggressive or constant parameters 
-  GapCheck(pPID, pSetpoint, pInput);
-  GapCheck(rPID, rSetpoint, rInput);
+  GapCheck(pPID, pSetpoint, pInput, 10);
+  GapCheck(rPID, rSetpoint, rInput, 10);
 
   pPID.Compute();
   rPID.Compute();
@@ -149,14 +207,18 @@ void loop() {
   Serial.print(", ");
   Serial.println(rOutput);
 
-  //Controll fin
+  /// Control fin
+  // pitch controlling fin 
   fin[1].write( 90 - pOutput );
-  fin[2].write( 90 - rOutput );
+  fin[2].write( 90 + pOutput );
+  // roll controlling fin 
+  fin[3].write( 90 - rOutput );
+  fin[4].write( 90 + rOutput );
 }
 
-void GapCheck(PID &pid, double Setpoint, double Input){
+void GapCheck(PID &pid, double Setpoint, double Input, double limit){
   double gap = abs(Setpoint - Input);
-  if(gap < 10)
+  if(gap < limit)
   {  //we're close to setpoint, use conservative tuning parameters
     pid.SetTunings(consKp, consKi, consKd);
     Serial.print(" con ");
