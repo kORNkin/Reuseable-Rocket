@@ -80,8 +80,9 @@ class IMUGY85 {
 		double getPitch();
 		double getYaw();
 		double getRawYaw();
-		double getAcceleration(double *a1, double *a2, double *a3);
-		double getGyro(double *m1, double *m2, double *m3);
+		void getAcceleration(double *a1, double *a2, double *a3);
+		void getGyro(double *g1, double *g2, double *g3);
+		void getMagneto(double *m1, double *m2, double *m3);
 	private:
 		void computeEuler();
 		void getAres();
