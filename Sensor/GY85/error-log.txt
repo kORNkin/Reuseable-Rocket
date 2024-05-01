@@ -1,0 +1,4 @@
+พี่พยายามใช้ filter ของ adafruit ที่น้องใช้กับเซนเซอร์ของ adafruit แต่แค่ include ไลบรารี่มาก็เออเรอ่ละ
+#include <Adafruit_AHRS.h>
+#include <Adafruit_Sensor_Calibration.h>
+สู้ๆนะจ้ะพ่อหนุ่ม TOI

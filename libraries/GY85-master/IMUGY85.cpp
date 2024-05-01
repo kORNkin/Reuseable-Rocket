@@ -90,18 +90,25 @@ double IMUGY85::getRawYaw()
     return degrees(yaw);
 }
 
-double IMUGY85::getAcceleration(double *a1, double *a2, double *a3)
+void IMUGY85::getAcceleration(double *a1, double *a2, double *a3)
 {
     *a1 = ax;
     *a2 = ay;
     *a3 = az;
 }
 
-double IMUGY85::getGyro(double *m1, double *m2, double *m3)
+void IMUGY85::getGyro(double *g1, double *g2, double *g3)
 {
-    *m1 = gx;
-    *m2 = gy;
-    *m3 = gz;
+    *g1 = gx;
+    *g2 = gy;
+    *g3 = gz;
+}
+
+void IMUGY85::getMagneto(double *m1,double *m2, double *m3)
+{
+	*m1 = mx;
+	*m2 = my;
+	*m3 = mz;
 }
 
 void IMUGY85::computeEuler()
