@@ -1,4 +1,6 @@
 #include <IMUGY85.h>
+#include <Adafruit_AHRS.h>
+#include <Adafruit_Sensor_Calibration.h>
 
 IMUGY85 imu;
 double ax, ay, az, gx, gy, gz, mx, my, mz, roll, pitch, yaw;
