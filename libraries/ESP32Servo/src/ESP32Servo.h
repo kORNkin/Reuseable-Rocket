@@ -70,16 +70,16 @@
 //Enforce only using PWM pins on the ESP32
 #define ENFORCE_PINS
 // Default Arduino Servo.h
-#define DEFAULT_uS_LOW 544
-#define DEFAULT_uS_HIGH 2400
+// #define DEFAULT_uS_LOW 544
+// #define DEFAULT_uS_HIGH 2400
 
 // Values for TowerPro MG995 large servos (and many other hobbyist servos)
 //#define DEFAULT_uS_LOW 1000        // 1000us
 //#define DEFAULT_uS_HIGH 2000      // 2000us
 
-// Values for TowerPro SG90 small servos
-//#define DEFAULT_uS_LOW 400
-//#define DEFAULT_uS_HIGH 2400
+//Values for TowerPro SG90 small servos
+#define DEFAULT_uS_LOW 400
+#define DEFAULT_uS_HIGH 2400
 
 #ifdef ARDUINO_ESP32C3_DEV
 #define MINIMUM_TIMER_WIDTH 10
