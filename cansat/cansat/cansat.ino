@@ -1,97 +1,107 @@
-#include <Adafruit_LSM6DS3TRC.h>
-#include <Adafruit_AHRS.h>
-#include <Adafruit_Sensor_Calibration.h>
-#include <Adafruit_LIS3MDL.h>
-#include <ESP32Servo.h>
-Servo fin1;
+// SPI define-----------------------------------------------------------------------
+#include "SPI.h"
 
-Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
+#define SPI_SCK 5
+#define SPI_MISO 19
+#define SPI_MOSI 27
+#define Select LOW
+#define DeSelect HIGH
 
-Adafruit_LIS3MDL lis3mdl;
-Adafruit_LSM6DS3TRC lsm6ds;
+// LoRa define----------------------------------------------------------------------
+#include <LoRa.h>
 
-Adafruit_NXPSensorFusion filter; // slowest
-//Adafruit_Madgwick filter;  // faster than NXP
-//Adafruit_Mahony filter;
+#define  LoRa_CS    18
+#define  LoRa_RST   14
+#define  DI0        26
+#define  BAND    917E6
+#define LoRaStatus 32
 
-#if defined(ADAFRUIT_SENSOR_CALIBRATION_USE_EEPROM)
-  Adafruit_Sensor_Calibration_EEPROM cal;
-#else
-  Adafruit_Sensor_Calibration_SDFat cal;
-#endif
+SPIClass LoRaSPI;
 
-#define FILTER_UPDATE_RATE_HZ 200
-#define PRINT_EVERY_N_UPDATES 10
+int counter = 0;
+unsigned int startTime;
+unsigned int curTime;
 
-uint32_t timestamp;
+//SD card define--------------------------------------------------------------------
+#include "FS.h"
+#include "SD.h"
 
-void setup() {
-  Serial.begin(9600);
 
-  //FIN Servo
-  fin1.attach(15);
+#define SD_CS 12
 
-  //IMU Prt
-  if (!lsm6ds.begin_I2C()) {
-    while (1) {
-      delay(10);
-    }
-  }
+//MPU6050 define--------------------------------------------------------------------
+#include <Adafruit_MPU6050.h>
+#include <Adafruit_Sensor.h>
+#include <Wire.h>
+#include <Kalman.h>
+Adafruit_MPU6050 mpu;
 
-  accelerometer = lsm6ds.getAccelerometerSensor();
-  gyroscope = lsm6ds.getGyroSensor();
-  magnetometer = &lis3mdl;
+double AccX, AccY, AccZ;
+double GyroX, GyroY, GyroZ;
+double roll, pitch;
+double dt, currentTime, previousTime;
+float AccErrorX, AccErrorY, AccErrorZ, GyroErrorX, GyroErrorY, GyroErrorZ;
+float meanX, meanY, meanGyroX, meanGyroY, meanAccX, meanAccY;
 
-  lsm6ds.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
-  lsm6ds.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
-  lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
+Kalman kalmanX; // Create the Kalman instances
+Kalman kalmanY;
+double kalAngleX, kalAngleY;
 
-  lsm6ds.setAccelDataRate(LSM6DS_RATE_1_66K_HZ);
-  lsm6ds.setGyroDataRate(LSM6DS_RATE_1_66K_HZ);
-  lis3mdl.setDataRate(LIS3MDL_DATARATE_1000_HZ);
-  lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
-  lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+int c = 0;
+const int MPU = 0x68;
 
-  filter.begin(FILTER_UPDATE_RATE_HZ);
+//BME280 define---------------------------------------------------------------------
+#include <Adafruit_BME280.h>
+
+#define I2C_SDA 21
+#define I2C_SCL 22
+#define SEALEVELPRESSURE_HPA (1013.25)
+
+TwoWire I2CBME = TwoWire(0);
+Adafruit_BME280 bme;
+
+float RefAltitude;
+float Temp;
+float ReaPressure;
+float ReaAltitude;
+float Humid;
+
+//GPS define------------------------------------------------------------------------
+#include <TinyGPS++.h>
+#include <SoftwareSerial.h>
+
+#define RXPin 16
+#define TXPin 17
+#define GPSstatus 33
+
+int GPSBaud = 9600;
+float latt, lonn;
+
+TinyGPSPlus gps;
+SoftwareSerial gpsSerial(RXPin, TXPin);
+
+void setup(){
+
+}
+
+void loop(){
 
 }
 
-void loop() {
 
-  float roll, pitch, heading;
-  float gx, gy, gz;
-  static uint8_t counter = 0;
 
-  sensors_event_t accel, gyro, mag;
-  accelerometer->getEvent(&accel);
-  gyroscope->getEvent(&gyro);
-  magnetometer->getEvent(&mag);
 
-  cal.calibrate(mag);
-  cal.calibrate(accel);
-  cal.calibrate(gyro);
-  gx = gyro.gyro.x * SENSORS_RADS_TO_DPS;
-  gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
-  gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
 
-  filter.update(gx, gy, gz, 
-                accel.acceleration.x, accel.acceleration.y, accel.acceleration.z, 
-                mag.magnetic.x, mag.magnetic.y, mag.magnetic.z);
-  if (counter++ <= PRINT_EVERY_N_UPDATES) {
-    return;
-  }
-  counter = 0;
 
-  roll = filter.getRoll();
-  pitch = filter.getPitch();
-  heading = filter.getYaw();
-  Serial.print(heading);
-  Serial.print(", ");
-  Serial.print(pitch);
-  Serial.print(", ");
-  Serial.println(roll);
 
-}
-void fin_contoller(){
-  
-}
+
+
+
+
+
+
+
+
+
+
+

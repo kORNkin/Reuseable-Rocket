@@ -5,7 +5,7 @@
 Servo fin[6];
 void setup() {
   Serial.begin(9600);
-  fin[1].attach(25);
+  fin[1].attach(15);
   fin[2].attach(33);
   fin[3].attach(32);
   fin[4].attach(13);
