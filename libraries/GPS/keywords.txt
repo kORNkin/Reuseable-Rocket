@@ -1,0 +1,37 @@
+##################################################
+# Syntax Coloring Map For GPS-library
+##################################################
+
+##################################################
+# Classes, datatypes and C++ keywords	(KEYWORD1)
+##################################################
+
+GPS	KEYWORD1
+
+##################################################
+# Methods and Functions			(KEYWORD2)
+##################################################
+begin	KEYWORD2
+find  KEYWORD2
+getDateTime	KEYWORD2
+getGeolocation	KEYWORD2
+getSatellites	KEYWORD2
+print	KEYWORD2
+read	KEYWORD2
+readString	KEYWORD2
+reset	KEYWORD2
+setBaud	KEYWORD2
+version	KEYWORD2
+write	KEYWORD2
+
+##################################################
+# Constants				(LITERAL1)
+##################################################
+
+GPS_HOTSTART	LITERAL1
+GPS_WARMSTART	LITERAL1
+
+##################################################
+# Built-in variables			(LITERAL2)
+##################################################
+

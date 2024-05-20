@@ -149,5 +149,4 @@ void loop() {
     // blink LED to indicate activity
     blinkState = !blinkState;
     digitalWrite(LED_PIN, blinkState);
-    delay(100);
 }

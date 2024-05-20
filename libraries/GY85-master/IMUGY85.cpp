@@ -90,14 +90,14 @@ double IMUGY85::getRawYaw()
     return degrees(yaw);
 }
 
-double IMUGY85::getAcceleration(double *a1, double *a2, double *a3)
+void IMUGY85::getAcceleration(double *a1, double *a2, double *a3)
 {
     *a1 = ax;
     *a2 = ay;
     *a3 = az;
 }
 
-double IMUGY85::getGyro(double *m1, double *m2, double *m3)
+void IMUGY85::getGyro(double *m1, double *m2, double *m3)
 {
     *m1 = gx;
     *m2 = gy;
