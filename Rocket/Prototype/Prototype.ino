@@ -97,6 +97,7 @@ PID yPID(&yInput, &yOutput, &ySetpoint, consKp, consKi, consKd, DIRECT);
 #include <ESP32Servo.h>
 
 Servo fin[5];
+Servo para;
 
 bool DEBUG_YAW = 0;
 
@@ -341,6 +342,15 @@ void SetupSdcard(){
   writeFile(SD, "/MPU.txt", "yaw pitch roll\n");
 }
 
+void SetupServo(){
+  fin[1].write(90);
+  fin[2].write(90);
+  fin[3].write(90);
+  fin[4].write(90);
+
+  para.write(0);
+}
+
 bool HeadIsOK(double yaw){
   int gapDeg = abs(yaw - ySetpoint);
   if(gapDeg < 10){
@@ -490,7 +500,6 @@ void PreLaunch(){
     Temp = ((float)((int)(Temp * 10))) / 10;
     pressureNow = bmp.readPressure() / 100.0F;
     pressureNow = ((float)((int)(pressureNow * 10))) / 10;
-    altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
     trend = altNow - altPrev;
     tset = tnow + 300;
     altPrev = altNow;
@@ -546,7 +555,7 @@ void EjectingPreparationState(){
 
 void EjectionRedundency(){
   unsigned int tair = tnow - tlaunch;
-  if(tair > 8 && tair < 9){
+  if(tair > 8){
     Serial.println("Eject (rdd)");
     Ejection();
     state = 3;
@@ -554,6 +563,12 @@ void EjectionRedundency(){
 }
 
 void NavigationState(){
+  if(altNow < 80) {
+    para.write(90);
+  }
+}
+
+void SendData(){
 
 }
 
@@ -571,8 +586,12 @@ void setup() {
   fin[3].attach(32);  
   fin[4].attach(13); 
 
+  para.attach(14);
+
   SetupIMU_PID();
   SetupSdcard();
+
+  SetupServo();
 
 //   Serial.print("Connecting to ");
 //   Serial.println(ssid);
@@ -607,8 +626,6 @@ void setup() {
 }
 
 void loop() {
-  IMURun();
-
   //------------ DEBUG YAW --------------
   // if(Serial.available()){
   
@@ -619,19 +636,23 @@ void loop() {
   
   //   state = in.toInt();
   // }
-  //-------------------------------------
-  
+  //------------------------------s-------
+
+  IMURun();
+
   tnow = millis();
+  altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
   
-  if(state == 1 ){ // Pre Launch State
-    Serial.println(" Pre Launch State");
+  if(state == 1 ){ // Pre Launching State
+    Serial.println(" Pre Launching State");
     PreLaunch();
   }else if(state == 2) { //Ejecting Preparation State
     Serial.println("Ejecting Preparation State");
     EjectingPreparationState();
     EjectionRedundency();
   }else if(state == 3) { //Navigation State
-
+    Serial.println("Navigation State");
+    NavigationState();
   }
 }
 
