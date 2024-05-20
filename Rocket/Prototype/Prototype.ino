@@ -551,8 +551,6 @@ void EjectingPreparationState(){
   Serial.print(altNow);
 }
 
-
-
 void EjectionRedundency(){
   unsigned int tair = tnow - tlaunch;
   if(tair > 8){
@@ -563,8 +561,11 @@ void EjectionRedundency(){
 }
 
 void NavigationState(){
+  
+
   if(altNow < 80) {
-    para.write(90);
+    SetupServer();
+    state = 4;
   }
 }
 
@@ -653,6 +654,8 @@ void loop() {
   }else if(state == 3) { //Navigation State
     Serial.println("Navigation State");
     NavigationState();
+  }else if(state == 4){ // Parachuting State
+    para.write(90);
   }
 }
 
