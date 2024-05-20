@@ -28,13 +28,20 @@ void setup() {
 
 void loop() {
 
-  setfin(90);
+  setfinAll(90);
   //servoCheck()
 
 }
 
 void setfin(int n){
   fin[1].write(n);
+}
+
+void setfinAll(int n){
+  fin[1].write(n);
+  fin[2].write(n);
+  fin[3].write(n);
+  fin[4].write(n);
 }
 
 void servoCheck(){

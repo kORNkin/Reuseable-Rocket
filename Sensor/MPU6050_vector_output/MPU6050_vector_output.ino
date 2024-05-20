@@ -41,12 +41,12 @@ void loop() {
   fusion.update( imu.gx(), imu.gy(), imu.gz(), imu.ax(), imu.ay(), imu.az() );    
 
   // Unit vectors of rectangular coodinates [Choose between GLOBAL_FRAME and LOCAL_FRAME]
-  vec3_t x = fusion.getXaxis(GLOBAL_FRAME);
-  vec3_t y = fusion.getYaxis(GLOBAL_FRAME);
-  vec3_t z = fusion.getZaxis(GLOBAL_FRAME);
+  vec3_t x = fusion.getXaxis(LOCAL_FRAME);
+  vec3_t y = fusion.getYaxis(LOCAL_FRAME);
+  vec3_t z = fusion.getZaxis(LOCAL_FRAME);
   
   const vec3_t VEC = {1, 1, 0};
-  vec3_t v = fusion.projectVector(VEC, GLOBAL_FRAME);
+  vec3_t v = fusion.projectVector(VEC, LOCAL_FRAME);
 
   // Display vectors:
   Serial.print( " x = " );

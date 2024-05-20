@@ -11,6 +11,23 @@
 #include <NTPClient.h>
 #include <WiFiUdp.h>
 
+#include <basicMPU6050.h>       // Library for IMU sensor. See this link: https://github.com/RCmags/basicMPU6050
+#include <imuFilter.h>
+
+#include <TinyGPS++.h>
+
+#define GPS_BAUDRATE 9600 
+
+TinyGPSPlus gps; 
+
+double latSet, latNow;
+double lngSet, lngNow;
+
+basicMPU6050<> imu;
+
+imuFilter fusion;
+
+
 // Replace with your network credentials
 const char* ssid     = "kORNkin";
 const char* password = "11111111";
@@ -85,8 +102,8 @@ double ySetpoint, yInput, yOutput;
 // double consKp=1, consKi=0.05, consKd=0.25;
 
 //Tuning Parameters (Tuning)
-double aggKp=4, aggKi=0, aggKd=0.5;
-double consKp=1, consKi=0, consKd=0.01;
+double aggKp=20, aggKi=0, aggKd=5;
+double consKp=15, consKi=0, consKd=1;
 
 //Specify the links and initial tuning parameters
 PID pPID(&pInput, &pOutput, &pSetpoint, consKp, consKi, consKd, DIRECT);
@@ -274,32 +291,45 @@ void testFileIO(fs::FS &fs, const char * path){
 }
 
 void SetupIMU_PID(){
-    //IMU Part
-  if (!lsm6ds.begin_I2C()) {
-    while (1) {
-      delay(10);
-    }
-  }
+  //   //IMU Part
+  // if (!lsm6ds.begin_I2C()) {
+  //   while (1) {
+  //     delay(10);
+  //   }
+  // }
 
-  accelerometer = lsm6ds.getAccelerometerSensor();
-  gyroscope = lsm6ds.getGyroSensor();
-  magnetometer = &lis3mdl;
+  // accelerometer = lsm6ds.getAccelerometerSensor();
+  // gyroscope = lsm6ds.getGyroSensor();
+  // magnetometer = &lis3mdl;
 
-  lsm6ds.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
-  lsm6ds.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
-  lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
+  // lsm6ds.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
+  // lsm6ds.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
+  // lis3mdl.setRange(LIS3MDL_RANGE_4_GAUSS);
 
-  lsm6ds.setAccelDataRate(LSM6DS_RATE_1_66K_HZ);
-  lsm6ds.setGyroDataRate(LSM6DS_RATE_1_66K_HZ);
-  lis3mdl.setDataRate(LIS3MDL_DATARATE_1000_HZ);
-  lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
-  lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+  // lsm6ds.setAccelDataRate(LSM6DS_RATE_1_66K_HZ);
+  // lsm6ds.setGyroDataRate(LSM6DS_RATE_1_66K_HZ);
+  // lis3mdl.setDataRate(LIS3MDL_DATARATE_1000_HZ);
+  // lis3mdl.setPerformanceMode(LIS3MDL_HIGHMODE);
+  // lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
 
-  filter.begin(FILTER_UPDATE_RATE_HZ);
+  // filter.begin(FILTER_UPDATE_RATE_HZ);
+
+  // Calibrate imu
+  imu.setup();
+  imu.setBias();
+  
+  // Initialize filter: 
+  fusion.setup( imu.ax(), imu.ay(), imu.az() );     
+                  
+  // Rotate heading:
+  float angle = 45 * DEG_TO_RAD;                // angle in radians to rotate heading about z-axis
+  fusion.rotateHeading( angle, LARGE_ANGLE );   // Can choose LARGE_ANGLE or SMALL_ANGLE approximation
+
+
 
   //PID Setpoints for directions of Rocket
   pSetpoint = 0;
-  rSetpoint = 0;
+  rSetpoint = -0.7;
   ySetpoint = 0;
 
   //Turn the PID on and set range of output 
@@ -365,8 +395,13 @@ double UseableYaw(double yaw){
   return yaw; 
 }
 
+void UpdateYawSetpointWithGPS(){
+  float x = latSet - latNow;
+  float y = lngSet - lngNow;
+}
+
 void YawControl(){
-  GapCheck(yPID, ySetpoint, yInput, 20);
+  GapCheck(yPID, ySetpoint, yInput, 2);
 
   yPID.Compute();
   
@@ -374,32 +409,25 @@ void YawControl(){
   Serial.println(yOutput);
 
   //yaw controlling fin
-  fin[1].write( 90 + yOutput );
-  fin[2].write( 90 + yOutput );
   fin[3].write( 90 + yOutput );
   fin[4].write( 90 + yOutput );
 }
 
-void RowPitchControl(){
+void RollControl(){
   //Gap check for using aggressive or constant parameters 
-  GapCheck(pPID, pSetpoint, pInput, 10);
-  GapCheck(rPID, rSetpoint, rInput, 10);
+  GapCheck(rPID, rSetpoint, rInput, 0.7);
 
-  pPID.Compute();
   rPID.Compute();
   
-  Serial.print(", ");
-  Serial.print(pOutput);
-  Serial.print(", ");
+  // Serial.print(", ");
+  // Serial.print(pOutput);
+  Serial.print(", r out:");
   Serial.println(rOutput);
 
   /// Control fin
-  // pitch controlling fin 
-  fin[1].write( 90 - pOutput );
-  fin[2].write( 90 + pOutput );
   // roll controlling fin 
-  fin[3].write( 90 - rOutput );
-  fin[4].write( 90 + rOutput );
+  fin[1].write( 90 - rOutput );
+  fin[2].write( 90 + rOutput );
 }
 
 void GapCheck(PID &pid, double Setpoint, double Input, double limit){
@@ -436,39 +464,57 @@ float ReadAltitude(float seaLevelhPa) {
   return Altitude;
 }
 
+void GPS(){
+  if (Serial2.available() > 0) {
+    if (gps.encode(Serial2.read())) {
+      if (gps.location.isValid()) {
+        latNow = gps.location.lat();
+        lngNow = gps.location.lng();
+      } else {
+        Serial.println(F("- location: INVALID"));
+      }
+    }
+  }
+}
+
 void IMURun(){
-  accelerometer->getEvent(&accel);
-  gyroscope->getEvent(&gyro);
-  magnetometer->getEvent(&mag);
+  // accelerometer->getEvent(&accel);
+  // gyroscope->getEvent(&gyro);
+  // magnetometer->getEvent(&mag);
 
-  cal.calibrate(mag);
-  cal.calibrate(accel);
-  cal.calibrate(gyro);
-  gx = gyro.gyro.x * SENSORS_RADS_TO_DPS;
-  gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
-  gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
+  // cal.calibrate(mag);
+  // cal.calibrate(accel);
+  // cal.calibrate(gyro);
+  // gx = gyro.gyro.x * SENSORS_RADS_TO_DPS;
+  // gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
+  // gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
 
-  ax = accel.acceleration.x;
-  ay = accel.acceleration.y;
-  az = accel.acceleration.z;
+  // ax = accel.acceleration.x;
+  // ay = accel.acceleration.y;
+  // az = accel.acceleration.z;
 
-  filter.update(gx, gy, gz, 
-                ax, ay, az, 
-                mag.magnetic.x, mag.magnetic.y, mag.magnetic.z);
+  // filter.update(gx, gy, gz, 
+  //               ax, ay, az, 
+  //               mag.magnetic.x, mag.magnetic.y, mag.magnetic.z);
 
   
-  // Delay time between printing              
-  // if (counter++ <= PRINT_EVERY_N_UPDATES) {
-  //   return;
-  // }
-  // counter = 0;
-  
+  // // Delay time between printing              
+  // // if (counter++ <= PRINT_EVERY_N_UPDATES) {
+  // //   return;
+  // // }
+  // // counter = 0;
 
-  roll = filter.getRoll();
-  pitch = filter.getPitch();
-  yaw = filter.getYaw();
+  // roll = filter.getRoll();
+  // pitch = filter.getPitch();
+  // yaw = filter.getYaw();
+  // //yaw = UseableYaw(yaw);
+
+
+  fusion.update( imu.gx(), imu.gy(), imu.gz(), imu.ax(), imu.ay(), imu.az() );    
+  roll = fusion.roll();
+  pitch = fusion.pitch();
+  yaw = fusion.yaw();
   
-  //yaw = UseableYaw(yaw);
 
   Serial.print(yaw);
   Serial.print(", ");
@@ -553,7 +599,7 @@ void EjectingPreparationState(){
 
 void EjectionRedundency(){
   unsigned int tair = tnow - tlaunch;
-  if(tair > 8){
+  if(tair > 12){
     Serial.println("Eject (rdd)");
     Ejection();
     state = 3;
@@ -561,12 +607,13 @@ void EjectionRedundency(){
 }
 
 void NavigationState(){
-  
-
-  if(altNow < 80) {
-    SetupServer();
-    state = 4;
-  }
+  RollControl();
+  UpdateYawSetpointWithGPS();
+  YawControl();
+  // if(altNow < 80) {
+  //   SetupServo();
+  //   state = 4;
+  // }
 }
 
 void SendData(){
@@ -576,8 +623,9 @@ void SendData(){
 void setup() {
 
   Serial.begin(9600);
+  Serial2.begin(GPS_BAUDRATE);
 
-  state = 1;
+  state = 3;
 
   /// FIN Pin Servo 
   // pitch controling fin
@@ -624,6 +672,10 @@ void setup() {
     while (1);
   }
   altRef = SetRefAltitude();
+
+  GPS();
+  latSet = latNow;
+  lngSet = lngNow;
 }
 
 void loop() {
@@ -640,6 +692,7 @@ void loop() {
   //------------------------------s-------
 
   IMURun();
+  GPS();
 
   tnow = millis();
   altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
@@ -652,12 +705,9 @@ void loop() {
     EjectingPreparationState();
     EjectionRedundency();
   }else if(state == 3) { //Navigation State
-    Serial.println("Navigation State");
     NavigationState();
+    //Serial.println("Navigation State");
   }else if(state == 4){ // Parachuting State
     para.write(90);
   }
 }
-
-
-
