@@ -1,5 +1,6 @@
 /*
  * Connect the SD card to the following pins:
+
  *
  * SD Card | ESP32
  *    D2       -
@@ -184,8 +185,8 @@ void setup(){
     Serial.begin(115200);
     pinMode(LORA_CS, OUTPUT);      
     digitalWrite(LORA_CS, HIGH);
-    spi1.begin(SPI_SCK, SPI_MISO, SPI_MOSI,SD_CS);
-    if(!SD.begin(SD_CS,spi1)){
+//   spi1.begin(SPI_SCK, SPI_MISO, SPI_MOSI,SD_CS);
+    if(!SD.begin(SD_CS)){
         Serial.println("Keep going dont give up");
         return;
     }
