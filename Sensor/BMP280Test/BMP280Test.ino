@@ -7,10 +7,6 @@
 #include <Wire.h>
 #include <Adafruit_BMP280.h>
 
-#include <WiFi.h>
-#include <NTPClient.h>
-#include <WiFiUdp.h>
-
 
 #include "FS.h"
 #include "SD.h"
@@ -24,19 +20,6 @@
 SPIClass spi1;
 
 char charVal[10];   
-
-// Replace with your network credentials
-const char* ssid     = "kORNkin";
-const char* password = "11111111";
-
-// Define NTP Client to get time
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
-
-// Variables to save date and time
-String formattedDate;
-String dayStamp;
-String timeStamp;
 
 #define I2C_SDA 18
 #define I2C_SCL 19
@@ -265,30 +248,6 @@ void setup() {
 
   SetupSDcard();
 
-  Serial.print("Connecting to ");
-  Serial.println(ssid);
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  // Print local IP address and start web server
-  Serial.println("");
-  Serial.println("WiFi connected.");
-  Serial.println("IP address: ");
-  Serial.println(WiFi.localIP());
-
-// Initialize a NTPClient to get time
-  timeClient.begin();
-  // Set offset time in seconds to adjust for your timezone, for example:
-  // GMT +1 = 3600
-  // GMT +8 = 28800
-  // GMT -1 = -3600
-  // GMT 0 = 0
-  timeClient.setTimeOffset(25200);
-
-
-
   bool status;
   status = bmp.begin(0x76, 0x60);
   if (!status) {
@@ -299,32 +258,10 @@ void setup() {
 }
 
 void loop() {
-
-  while(!timeClient.update()) {
-    timeClient.forceUpdate();
-  }
-  // The formattedDate comes with the following format:
-  // 2018-05-28T16:00:13Z
-  // We need to extract date and time
-  formattedDate = timeClient.getFormattedDate();
-  Serial.println(formattedDate);
-
-  // Extract date
-  int splitT = formattedDate.indexOf("T");
-  dayStamp = formattedDate.substring(0, splitT);
-  Serial.print("DATE: ");
-  Serial.println(dayStamp);
-  // Extract time
-  timeStamp = formattedDate.substring(splitT+1, formattedDate.length()-1);
-  Serial.print("HOUR: ");
-  Serial.println(timeStamp);
-
-
-
   altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef; 
-  Serial.println(altNow);
+  Serial.println(altNow);  
 
-  appendFile(SD, "/Alt.txt", dtostrf(timeStamp 4, 3, charVal));
+  appendFile(SD, "/Alt.txt", dtostrf(millis(), 4, 3, charVal));
   appendFile(SD, "/Alt.txt", ": ");
   appendFile(SD, "/Alt.txt", dtostrf(altNow, 4, 3, charVal));
   appendFile(SD, "/Alt.txt", " m\n");
