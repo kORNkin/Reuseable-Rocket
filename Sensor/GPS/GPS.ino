@@ -24,10 +24,10 @@ void loop() {
     if (gps.encode(Serial2.read())) {
       if (gps.location.isValid()) {
         Serial.print(F("- latitude: "));
-        Serial.println(gps.location.lat());
+        Serial.println(gps.location.lat(), 6);
 
         Serial.print(F("- longitude: "));
-        Serial.println(gps.location.lng());
+        Serial.println(gps.location.lng(), 6);
 
         Serial.print(F("- altitude: "));
         if (gps.altitude.isValid())

@@ -16,7 +16,26 @@
 
 #include <TinyGPS++.h>
 
+bool gpsStatus = 0;
+
+#include <SPI.h>
+#include <LoRa.h>
+
+#define  LoRa_SCK   18
+#define  LoRa_MISO  19
+#define  LoRa_MOSI  23
+#define  LoRa_CS    5
+#define  LoRa_RST   14
+#define  DI0        2
+#define  BAND    433E6
+
+#define  Select    LOW   //  Low CS means that SPI device Selected
+#define  DeSelect  HIGH  //  High CS means that SPI device Deselected
+
 #define GPS_BAUDRATE 9600 
+
+#define rled 27
+#define gled 26
 
 TinyGPSPlus gps; 
 
@@ -102,8 +121,8 @@ double ySetpoint, yInput, yOutput;
 // double consKp=1, consKi=0.05, consKd=0.25;
 
 //Tuning Parameters (Tuning)
-double aggKp=20, aggKi=0, aggKd=5;
-double consKp=15, consKi=0, consKd=1;
+double aggKp=23, aggKi=0, aggKd=6;
+double consKp=15, consKi=0, consKd=4;
 
 //Specify the links and initial tuning parameters
 PID pPID(&pInput, &pOutput, &pSetpoint, consKp, consKi, consKd, DIRECT);
@@ -114,7 +133,7 @@ PID yPID(&yInput, &yOutput, &ySetpoint, consKp, consKi, consKd, DIRECT);
 #include <ESP32Servo.h>
 
 Servo fin[5];
-Servo para;
+Servo para, eject;
 
 bool DEBUG_YAW = 0;
 
@@ -130,6 +149,8 @@ int state = 1;
 #define SD_CS 2
 
 SPIClass spi1;
+
+float N = -0.4, S = 2.74;
 
 char charVal[10];  
 
@@ -329,7 +350,7 @@ void SetupIMU_PID(){
 
   //PID Setpoints for directions of Rocket
   pSetpoint = 0;
-  rSetpoint = -0.7;
+  rSetpoint = 1.55;
   ySetpoint = 0;
 
   //Turn the PID on and set range of output 
@@ -340,7 +361,7 @@ void SetupIMU_PID(){
   rPID.SetOutputLimits(-45, 45);
 
   yPID.SetMode(AUTOMATIC);
-  yPID.SetOutputLimits(-45, 45);
+  yPID.SetOutputLimits(-35, 35);
 }
 
 void SetupSdcard(){
@@ -370,6 +391,10 @@ void SetupSdcard(){
   Serial.printf("SD Card Size: %lluMB\n", cardSize);
 
   writeFile(SD, "/MPU.txt", "yaw pitch roll\n");
+  writeFile(SD, "/Altitude.txt", "Altitude\n");
+  writeFile(SD, "/GPS.txt", "lat lng\n");
+  writeFile(SD, "/State.txt", "State\n");
+  writeFile(SD, "/.txt", "State\n");
 }
 
 void SetupServo(){
@@ -396,17 +421,34 @@ double UseableYaw(double yaw){
 }
 
 void UpdateYawSetpointWithGPS(){
-  float x = latSet - latNow;
-  float y = lngSet - lngNow;
+  float y = latNow - latSet;
+  float x = lngNow - lngSet;
+
+  float deg = atan(abs(y) / abs(x));
+  deg = deg / 360 * 6.28;
+
+  if(y > 0){
+    if(x > 0){
+      ySetpoint = S - deg;
+    }else {
+      ySetpoint = S + deg;
+    }
+  }else {
+    if(x > 0){
+      ySetpoint = N - deg;  
+    }else {
+      ySetpoint = N + deg;
+    }
+  }
 }
 
 void YawControl(){
-  GapCheck(yPID, ySetpoint, yInput, 2);
+  GapCheck(yPID, ySetpoint, yInput, 0.7);
 
   yPID.Compute();
   
-  Serial.print(", ");
-  Serial.println(yOutput);
+  Serial.print(", y out:");
+  Serial.print(yOutput);
 
   //yaw controlling fin
   fin[3].write( 90 + yOutput );
@@ -422,7 +464,7 @@ void RollControl(){
   // Serial.print(", ");
   // Serial.print(pOutput);
   Serial.print(", r out:");
-  Serial.println(rOutput);
+  Serial.print(rOutput);
 
   /// Control fin
   // roll controlling fin 
@@ -470,11 +512,29 @@ void GPS(){
       if (gps.location.isValid()) {
         latNow = gps.location.lat();
         lngNow = gps.location.lng();
+        Serial.print(", ");
+        Serial.print(latNow);
+        Serial.print(", ");
+        Serial.println(lngNow);
+
+        gpsStatus = 1;
+        digitalWrite (gled, HIGH);
       } else {
-        Serial.println(F("- location: INVALID"));
+        Serial.print(F(", - location: INVALID"));
+
+        gpsStatus = 0;
+        digitalWrite (gled, LOW);
       }
+    } else {
+      Serial.print(F(", GPS INVALID"));
+      
+      gpsStatus = 0;
+      digitalWrite (gled, LOW);
     }
   }
+
+  if (millis() > 5000 && gps.charsProcessed() < 10)
+    Serial.print(F(", No GPS data received: check wiring"));
 }
 
 void IMURun(){
@@ -525,13 +585,6 @@ void IMURun(){
   pInput = pitch;
   rInput = roll;
   yInput = yaw;
-
-  appendFile(SD, "/MPU.txt", dtostrf(yaw, 4, 3, charVal));
-  appendFile(SD, "/MPU.txt", ", ");
-  appendFile(SD, "/MPU.txt", dtostrf(pitch, 4, 3, charVal));
-  appendFile(SD, "/MPU.txt", ", ");
-  appendFile(SD, "/MPU.txt", dtostrf(roll, 4, 3, charVal));
-  appendFile(SD, "/MPU.txt", "\n");
 }
 
 void Ejection(){
@@ -547,19 +600,25 @@ void PreLaunch(){
     pressureNow = bmp.readPressure() / 100.0F;
     pressureNow = ((float)((int)(pressureNow * 10))) / 10;
     trend = altNow - altPrev;
-    tset = tnow + 300;
+    tset = tnow + 500;
     altPrev = altNow;
-    if(trend > 1)
+    if(trend > 0)
       check++;
-    else check--;  
+    else check = 0;  
 
     Serial.print(tnow);
     Serial.println(" checkLunch");
   }
 
-  tlaunch = tnow;
+  
   if(check >= 5){
     Serial.println("Launch!!!");
+
+    LoRa.beginPacket();
+    LoRa.println("Launch!");
+    LoRa.endPacket();
+
+    tlaunch = tnow;
     state = 2;
     
     check = 0;
@@ -576,11 +635,11 @@ void EjectingPreparationState(){
     pressureNow = ((float)((int)(pressureNow * 10))) / 10;
     altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
     trend = altNow - altPrev;
-    tset = tnow + 200;
+    tset = tnow + 300;
     altPrev = altNow;
-    if(trend < 2)
+    if(trend < 0)
       check++;
-    else check--;  
+    else check;  
     
     Serial.print(tnow);
     Serial.println(" checkEject");
@@ -599,33 +658,92 @@ void EjectingPreparationState(){
 
 void EjectionRedundency(){
   unsigned int tair = tnow - tlaunch;
-  if(tair > 12){
+  if(tair > 12500){
     Serial.println("Eject (rdd)");
-    Ejection();
     state = 3;
   }
 }
 
 void NavigationState(){
-  RollControl();
-  UpdateYawSetpointWithGPS();
-  YawControl();
-  // if(altNow < 80) {
-  //   SetupServo();
-  //   state = 4;
-  // }
+
+  if(gpsStatus){
+    RollControl();
+
+    if(roll > 1.25 && roll < 1.75){
+      UpdateYawSetpointWithGPS();
+      YawControl();
+    }
+  }else {
+    rSetpoint = 1.2;
+    RollControl();
+  }
+
+  if(altNow < 80) {
+    SetupServo();
+    state = 4;
+  }
 }
 
 void SendData(){
+  LoRa.beginPacket();
 
+  // timestamp, yaw, pitch, roll, altitude, lat, lng, rOutput, yOutput, state
+  //     1       2     3     4        5      6    7      8        9      10 
+  LoRa.print(tnow);
+  LoRa.print(", ");
+  LoRa.print(yaw);
+  LoRa.print(", ");
+  LoRa.print(pitch);
+  LoRa.print(", ");
+  LoRa.print(roll);
+  LoRa.print(", ");
+  LoRa.print(altNow);
+  LoRa.print(", ");
+  LoRa.print(latNow,6);
+  LoRa.print(", ");
+  LoRa.print(lngNow,6);
+  LoRa.print(", ");
+  LoRa.print(rOutput);
+  LoRa.print(", ");
+  LoRa.print(yOutput);
+  LoRa.print(", ");
+  LoRa.print(state);
+
+  LoRa.println();
+  LoRa.endPacket();
+
+  appendFile(SD, "/MPU.txt", dtostrf(tnow, 4, 3, charVal));
+  appendFile(SD, "/MPU.txt", ", ");
+  appendFile(SD, "/MPU.txt", dtostrf(yaw, 4, 3, charVal));
+  appendFile(SD, "/MPU.txt", ", ");
+  appendFile(SD, "/MPU.txt", dtostrf(pitch, 4, 3, charVal));
+  appendFile(SD, "/MPU.txt", ", ");
+  appendFile(SD, "/MPU.txt", dtostrf(roll, 4, 3, charVal));
+  appendFile(SD, "/MPU.txt", "\n");
+
+  appendFile(SD, "/Altitude.txt", dtostrf(tnow, 4, 3, charVal));
+  appendFile(SD, "/Altitude.txt", ", ");
+  appendFile(SD, "/Altitude.txt", dtostrf(altNow, 4, 3, charVal));
+  appendFile(SD, "/Altitude.txt", "\n");
+
+  appendFile(SD, "/GPS.txt", dtostrf(tnow, 4, 3, charVal));
+  appendFile(SD, "/GPS.txt", ", ");
+  appendFile(SD, "/GPS.txt", dtostrf(latNow, 4, 6, charVal));
+  appendFile(SD, "/GPS.txt", ", ");
+  appendFile(SD, "/GPS.txt", dtostrf(lngNow, 4, 6, charVal));
+  appendFile(SD, "/GPS.txt", "\n");
 }
 
 void setup() {
+  pinMode(gled, OUTPUT);
+  pinMode(rled, OUTPUT);  
+  
+  digitalWrite (rled, HIGH);	
 
   Serial.begin(9600);
   Serial2.begin(GPS_BAUDRATE);
 
-  state = 3;
+  state = 1;
 
   /// FIN Pin Servo 
   // pitch controling fin
@@ -635,49 +753,47 @@ void setup() {
   fin[3].attach(32);  
   fin[4].attach(13); 
 
-  para.attach(14);
+  para.attach(12);
+  eject.attach(15);
+
 
   SetupIMU_PID();
   SetupSdcard();
 
   SetupServo();
 
-//   Serial.print("Connecting to ");
-//   Serial.println(ssid);
-//   WiFi.begin(ssid, password);
-//   while (WiFi.status() != WL_CONNECTED) {
-//     delay(500);
-//     Serial.print(".");
-//   }
-//   // Print local IP address and start web server
-//   Serial.println("");
-//   Serial.println("WiFi connected.");
-//   Serial.println("IP address: ");
-//   Serial.println(WiFi.localIP());
-
-// // Initialize a NTPClient to get time
-//   timeClient.begin();
-//   // Set offset time in seconds to adjust for your timezone, for example:
-//   // GMT +1 = 3600
-//   // GMT +8 = 28800
-//   // GMT -1 = -3600
-//   // GMT 0 = 0
-//   timeClient.setTimeOffset(25200);
-
-
   bool status;
   status = bmp.begin(0x76, 0x60);
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
     while (1);
-  }
-  altRef = SetRefAltitude();
-
+  }////////////**
   GPS();
-  latSet = latNow;
-  lngSet = lngNow;
+  latSet = 15.662428;
+  lngSet = 100.139319;
+
+  while (!Serial);
+
+  SPI.begin( LoRa_SCK, LoRa_MISO, LoRa_MOSI, LoRa_CS );
+  LoRa.setPins( LoRa_CS, LoRa_RST, DI0 );
+  digitalWrite(LoRa_CS, Select);   //  SELECT (low) LoRa SPI
+  //Serial.println("LoRa Sender");
+  if (!LoRa.begin(BAND)) {
+    Serial.println("Starting LoRa failed!");
+  } else {
+    Serial.println("LoRa Initial OK!");
+    delay(1000);
+  }
+
+  N = yaw;
+  S = N + 3.14;
+  if(S > 3.14) S = -(3.14 - (S - 3.14)); 
+  
+  digitalWrite(rled, LOW);	
 }
 
+
+long lastMillis = 0;
 void loop() {
   //------------ DEBUG YAW --------------
   // if(Serial.available()){
@@ -689,25 +805,62 @@ void loop() {
   
   //   state = in.toInt();
   // }
-  //------------------------------s-------
+  //-------------------------------------
+  long currentMillis = millis();
 
-  IMURun();
-  GPS();
+  if(currentMillis - lastMillis > 300){
+    IMURun();
+    GPS();
 
-  tnow = millis();
-  altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
-  
-  if(state == 1 ){ // Pre Launching State
-    Serial.println(" Pre Launching State");
-    PreLaunch();
-  }else if(state == 2) { //Ejecting Preparation State
-    Serial.println("Ejecting Preparation State");
-    EjectingPreparationState();
-    EjectionRedundency();
-  }else if(state == 3) { //Navigation State
-    NavigationState();
-    //Serial.println("Navigation State");
-  }else if(state == 4){ // Parachuting State
-    para.write(90);
+    tnow = millis();
+    altNow = ReadAltitude(SEALEVELPRESSURE_HPA) - altRef;
+    
+    if(state == 1){ // Pre Launching State
+      Serial.println(" Pre Launching State");
+      PreLaunch();
+
+      //LoRa.beginPacket();
+      //LoRa.print("Pre Launching State\n");
+      //LoRa.endPacket();
+          
+      appendFile(SD, "/State.txt", dtostrf(tnow, 4, 3, charVal));
+      appendFile(SD, "/State.txt", " Pre Launching State\n");
+    }else if(state == 2) { //Ejecting Preparation State
+      Serial.println("Ejecting Preparation State");
+      //EjectingPreparationState();
+      EjectionRedundency();
+
+      //LoRa.beginPacket();
+      //LoRa.print("Ejecting Preparation State\n");
+      //LoRa.endPacket();
+
+      appendFile(SD, "/State.txt", dtostrf(tnow, 4, 3, charVal));
+      appendFile(SD, "/State.txt", " Ejecting Preparation State\n");
+    }else if(state == 3) { //Navigation State
+      Serial.println("Navigation State");
+      NavigationState();
+
+      //LoRa.beginPacket();
+      //LoRa.print("Navigation State\n");
+      //LoRa.endPacket();
+
+      appendFile(SD, "/State.txt", dtostrf(tnow, 4, 3, charVal));
+      appendFile(SD, "/State.txt", " Navigation State\n");
+    }else if(state == 4){ // Parachuting State
+      para.write(90);
+
+      //LoRa.beginPacket();
+      //LoRa.print("Parachuting State\n");
+      //LoRa.endPacket();
+
+      appendFile(SD, "/State.txt", dtostrf(tnow, 4, 3, charVal));
+      appendFile(SD, "/State.txt", " Parachuting State\n");
+    }
+
+    Serial.println();
+
+    SendData();
+
+    lastMillis = currentMillis;
   }
 }

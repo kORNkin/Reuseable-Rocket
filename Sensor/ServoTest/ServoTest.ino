@@ -10,6 +10,7 @@
 #include <ESP32Servo.h>
 
 Servo fin[5];
+Servo para;
 
 void setup() {
 
@@ -23,13 +24,15 @@ void setup() {
   // roll controling fin
   fin[3].attach(32);  
   fin[4].attach(13); 
+  para.attach(12);
 
 }
 
 void loop() {
 
-  setfinAll(90);
-  //servoCheck()
+  para.write(90);
+  //setfinAll(90);
+  //servoCheck();
 
 }
 
@@ -45,10 +48,10 @@ void setfinAll(int n){
 }
 
 void servoCheck(){
-  fin[1].write(0);
-  fin[2].write(0);
-  fin[3].write(0);
-  fin[4].write(0);
+  fin[1].write(45);
+  fin[2].write(45);
+  fin[3].write(45);
+  fin[4].write(45);
 
   delay(500);
 
@@ -59,10 +62,10 @@ void servoCheck(){
 
   delay(500);
 
-  fin[1].write(180);
-  fin[2].write(180);
-  fin[3].write(180);
-  fin[4].write(180);
+  fin[1].write(135);
+  fin[2].write(135);
+  fin[3].write(135);
+  fin[4].write(135);
 
   delay(1000);
 
