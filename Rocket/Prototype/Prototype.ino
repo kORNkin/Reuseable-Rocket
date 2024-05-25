@@ -766,8 +766,11 @@ void setup() {
   status = bmp.begin(0x76, 0x60);
   if (!status) {
     Serial.println("Could not find a valid BME280 sensor, check wiring!");
-    while (1);
+    //while (1);
   }////////////**
+  
+  altRef = ReadAltitude(SEALEVELPRESSURE_HPA);
+
   GPS();
   latSet = 15.662428;
   lngSet = 100.139319;
