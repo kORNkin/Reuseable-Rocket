@@ -145,15 +145,16 @@ void setup() {
   digitalWrite(GPSstatus,LOW);
 }
 
+// Don't you ever dare use Serial print in real rocket cuz it fucking slowed your lapsed time
 void loop() {
   if (millis() >= readtime) {
     digitalWrite(LoRaStatus, HIGH);
     delay(10);
     curTime = millis() - startTime;
-    Serial.print(counter);
-    Serial.print(",");
-    Serial.print(curTime);
-    Serial.print(",");
+    // Serial.print(counter);
+    // Serial.print(",");
+    // Serial.print(curTime);
+    // Serial.print(",");
 
     //MPU6050 loop--------------------------------------------------------------------
     sensors_event_t a, g, temp;
@@ -189,26 +190,26 @@ void loop() {
     kalAngleY = kalmanY.getAngle(pitch, GyroY, dt);
 
     // Serial.print("AccelX:");
-    Serial.print(AccX);
-    Serial.print(",");
+    // Serial.print(AccX);
+    // Serial.print(",");
     // Serial.print("AccelY:");
-    Serial.print(AccY);
-    Serial.print(",");
+    // Serial.print(AccY);
+    // Serial.print(",");
     // Serial.print("AccelZ:");
-    Serial.print(AccZ);
-    Serial.print(",");
+    // Serial.print(AccZ);
+    // Serial.print(",");
     // Serial.print("GyroX:");
-    Serial.print(GyroX);
-    Serial.print(",");
+    // Serial.print(GyroX);
+    // Serial.print(",");
     // Serial.print("GyroY:");
-    Serial.print(GyroY);
-    Serial.print(",");
+    // Serial.print(GyroY);
+    // Serial.print(",");
     // Serial.print("Kroll:");
-    Serial.print(kalAngleX);
-    Serial.print(",");
+    // Serial.print(kalAngleX);
+    // Serial.print(",");
     // Serial.print("Kpitch:");
-    Serial.print(kalAngleY);
-    Serial.print(",");
+    // Serial.print(kalAngleY);
+    // Serial.print(",");
     
 
     //BME280 loop---------------------------------------------------------------------
@@ -223,14 +224,14 @@ void loop() {
     Humid = bme.readHumidity();
     Humid = ((float)((int)(Humid * 10))) / 10;
 
-    Serial.print(Temp);
-    Serial.print(",");
-    Serial.print(ReaPressure);
-    Serial.print(",");
-    Serial.print(Humid);
-    Serial.print(",");
-    Serial.print(ReaAltitude);
-    Serial.print(",");
+    // Serial.print(Temp);
+    // Serial.print(",");
+    // Serial.print(ReaPressure);
+    // Serial.print(",");
+    // Serial.print(Humid);
+    // Serial.print(",");
+    // Serial.print(ReaAltitude);
+    // Serial.print(",");
 
     //GPS loop----------------------------------------------------------------------
     while (gpsSerial.available() > 0)
@@ -245,10 +246,10 @@ void loop() {
         }
       }
     }
-    Serial.print(latt, 6);
-    Serial.print(",");
-    Serial.print(lonn, 6);
-    Serial.println("");
+    // Serial.print(latt, 6);
+    // Serial.print(",");
+    // Serial.print(lonn, 6);
+    // Serial.println("");
     //LoRa loop-----------------------------------------------------------------------
     LoRa.beginPacket();
     LoRa.println(LoRaPacket());
